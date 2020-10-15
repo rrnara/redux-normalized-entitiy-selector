@@ -1,4 +1,4 @@
-import { map, findKey, compact, keys } from 'lodash';
+import { findKey, compact, keys, isFunction } from 'lodash';
 import { schema } from 'normalizr';
 
 for (let key of ['Entity', 'Array', 'Object', 'Union', 'Values']) {
@@ -7,14 +7,17 @@ for (let key of ['Entity', 'Array', 'Object', 'Union', 'Values']) {
 export const NormalizrSchema = schema;
 
 function proptypesFor(classes) {
-  return map(classes, function (klass) {
-    return function (props, propName, componentName) {
-      if (!(props[propName] instanceof klass)) {
-        return new Error('Invalid prop `' + propName + '` supplied to `' + componentName + '`. Validation failed.');
+  const propTypes = {};
+  for (const entityName of Object.keys(classes)) {
+    propTypes[entityName] = function (props, propName, componentName) {
+      const getName = props[propName].getName;
+      if (!isFunction(getName) || getName() !== entityName) {
+        return new Error('Invalid prop `' + propName + '` supplied to `' + componentName + '`, expected `'+ entityName + '`. Validation failed.');
       }
       return undefined;
     };
-  });
+  }
+  return propTypes;
 }
 
 class DefaultEntityBase {}
@@ -49,7 +52,7 @@ export default function ormGenerator(normalizrSchema, classExtensions, reduxStor
     var associationNames = Object.keys(associations || {});
 
     const EntityBase = classExtensions[entityName] || DefaultEntityBase;
-    class EntityClass extends EntityBase {
+    entityClasses[entityName] = class extends EntityBase {
       #state;
       #attr;
 
@@ -86,12 +89,11 @@ export default function ormGenerator(normalizrSchema, classExtensions, reduxStor
 
     associationNames.forEach(function (name) {
       function selectObject() {
-        return selectors[associationNamesToEntityNames[name]](this.getState(), this.getAttr()[name]);
+        return selectors[associationNamesToEntityNames[name]](this.getState(), this.getAttr()[name], true); //undefinedIsEmpty is true
       }
-      EntityClass.prototype[name] = selectObject;
+      entityClasses[entityName].prototype[name] = selectObject;
     });
 
-    entityClasses[entityName] = EntityClass;
     selectors[entityName] = function (state, id) {
       // Check existance
       if (!state[reduxStore][entityTableName] || !state[reduxStore][entityTableName][id]) {
