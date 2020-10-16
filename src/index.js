@@ -1,24 +1,10 @@
-import { findKey, compact, keys, isFunction } from 'lodash';
+import { findKey, compact, keys, isFunction, mapValues, get } from 'lodash';
 import { schema } from 'normalizr';
 
 for (let key of ['Entity', 'Array', 'Object', 'Union', 'Values']) {
   schema[key].prototype.getType = () => key;
 }
 export const NormalizrSchema = schema;
-
-function proptypesFor(classes) {
-  const propTypes = {};
-  for (const entityName of Object.keys(classes)) {
-    propTypes[entityName] = function (props, propName, componentName) {
-      const getName = props[propName].getName;
-      if (!isFunction(getName) || getName() !== entityName) {
-        return new Error('Invalid prop `' + propName + '` supplied to `' + componentName + '`, expected `'+ entityName + '`. Validation failed.');
-      }
-      return undefined;
-    };
-  }
-  return propTypes;
-}
 
 class DefaultEntityBase {}
 
@@ -78,6 +64,10 @@ export default function ormGenerator(normalizrSchema, classExtensions, reduxStor
         }
       }
 
+      getEntityName() {
+        return entityName;
+      }
+
       getState() {
         return this.#state;
       }
@@ -115,6 +105,14 @@ export default function ormGenerator(normalizrSchema, classExtensions, reduxStor
     };
   });
 
-  const PropTypes = proptypesFor(entityClasses);
+  const PropTypes = mapValues(entityClasses, (_klass, entityName) => {
+    return (props, propName, componentName) => {
+      const getEntityName = get(props, `${propName}.getEntityName`);
+      if (!isFunction(getEntityName) || getEntityName() !== entityName) {
+        return new Error('Invalid prop `' + propName + '` supplied to `' + componentName + '`, expected `'+ entityName + '`. Validation failed.');
+      }
+      return undefined;
+    };
+  });
   return { Selectors: selectors, Classes: entityClasses, PropTypes: PropTypes };
 }
