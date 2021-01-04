@@ -24,7 +24,7 @@ export default function ormGenerator(normalizrSchema, classExtensions, reduxStor
     Object.keys(associations).forEach(name => {
       const type = assiciationType(name);
       // If this association refers to another single object type
-      if (type === 'Entity') {
+      if (type === 'Entity' || type === 'Union') {
         // Find the entity name of the association, since name may not use same string as entity name
         var assocSchemaName = findKey(normalizrSchema, obj => obj === associations[name]);
         associationNamesToEntityNames[name] = assocSchemaName;
@@ -51,12 +51,12 @@ export default function ormGenerator(normalizrSchema, classExtensions, reduxStor
           // set the modified id names for the keys
           if (associationNames.includes(key)) {
             const type = assiciationType(key);
-            if (type === 'Entity') {
+            if (type === 'Entity' || type === 'Union') {
               this[key + 'Id'] = attrs[key];
             } else if (type === 'Array') {
               this[key + 'Ids'] = attrs[key];
             } else {
-              console.error('unknown key type');
+              console.error(`unknown key type: ${key}`);
             }
           } else {
             this[key] = attrs[key];
@@ -79,7 +79,11 @@ export default function ormGenerator(normalizrSchema, classExtensions, reduxStor
 
     associationNames.forEach(function (name) {
       function selectObject() {
-        return selectors[associationNamesToEntityNames[name]](this.getState(), this.getAttr()[name], true); //undefinedIsEmpty is true
+        const attribute = this.getAttr()[name]
+        if (get(attribute,'schema') && attribute.id) {
+          return selectors[attribute.schema](this.getState(), attribute.id, true); //undefinedIsEmpty is true
+        }
+        return selectors[associationNamesToEntityNames[name]](this.getState(), attribute, true); //undefinedIsEmpty is true
       }
       entityClasses[entityName].prototype[name] = selectObject;
     });
