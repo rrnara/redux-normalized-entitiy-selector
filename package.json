@@ -1,6 +1,6 @@
 {
   "name": "redux-normalized-entitiy-selector",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Enables selecting normalized entities as class with functions from Redux State",
   "main": "dist/index.js",
   "scripts": {

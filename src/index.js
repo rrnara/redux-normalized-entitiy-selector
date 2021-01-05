@@ -123,10 +123,13 @@ export default function ormGenerator(normalizrSchema, classExtensions, reduxStor
 
   const PropTypes = mapValues(entityClasses, (klass, entityName) => {
     return (props, propName, componentName) => {
-      const getEntityName = get(props, `${propName}.getEntityName`);
-      const entityNameToUse = klass.getEntityType ? klass.getEntityType(get(props, propName)) : entityName;
-      if (!isFunction(getEntityName) || getEntityName() !== entityNameToUse) {
-        return new Error('Invalid prop `' + propName + '` supplied to `' + componentName + '`, expected `'+ entityName + '`. Validation failed.');
+      const entity = get(props, propName)
+      if (entity != null) {
+        const entityNameToUse = klass.getEntityType ? klass.getEntityType(entity) : entityName;
+        const getEntityName = get(entity, 'getEntityName');
+        if (!isFunction(getEntityName) || getEntityName() !== entityNameToUse) {
+          return new Error('Invalid prop `' + propName + '` supplied to `' + componentName + '`, expected `'+ entityName + '`. Validation failed.');
+        }
       }
       return undefined;
     };
