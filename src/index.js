@@ -15,6 +15,19 @@ export default function ormGenerator(normalizrSchema, classExtensions, reduxStor
     const entity = normalizrSchema[entityName];
     const entityTableName = normalizrSchema[entityName].key;
     const associations = entity.schema;
+    const EntityBase = classExtensions[entityName] || DefaultEntityBase;
+    const entityType = entity.getType()
+    if (entityType !== 'Entity') {
+      if (entityType === 'Union') {
+        entityClasses[entityName] = class extends EntityBase {
+          static getEntityType(value) {
+            return entity._schemaAttribute(value);
+          }
+        }
+      }
+      return;
+    }
+
     function assiciationType(key) {
       return Array.isArray(associations[key]) ? 'Array' : associations[key].getType ? associations[key].getType() : null;
     }
@@ -37,7 +50,6 @@ export default function ormGenerator(normalizrSchema, classExtensions, reduxStor
 
     var associationNames = Object.keys(associations || {});
 
-    const EntityBase = classExtensions[entityName] || DefaultEntityBase;
     entityClasses[entityName] = class extends EntityBase {
       #state;
       #attr;
@@ -109,10 +121,11 @@ export default function ormGenerator(normalizrSchema, classExtensions, reduxStor
     };
   });
 
-  const PropTypes = mapValues(entityClasses, (_klass, entityName) => {
+  const PropTypes = mapValues(entityClasses, (klass, entityName) => {
     return (props, propName, componentName) => {
       const getEntityName = get(props, `${propName}.getEntityName`);
-      if (!isFunction(getEntityName) || getEntityName() !== entityName) {
+      const entityNameToUse = klass.getEntityType ? klass.getEntityType(get(props, propName)) : entityName;
+      if (!isFunction(getEntityName) || getEntityName() !== entityNameToUse) {
         return new Error('Invalid prop `' + propName + '` supplied to `' + componentName + '`, expected `'+ entityName + '`. Validation failed.');
       }
       return undefined;
